@@ -1,15 +1,16 @@
 Param(
-	[Parameter(Mandatory, HelpMessage="Please provide a name for the app")][string] $AppName,
-	[Parameter(Mandatory, HelpMessage="Please provide the glob pattern to identify the main jar")][string] $MainJarGlob,
-	[Parameter(Mandatory, HelpMessage="Please provide the module- and main class path to start the app")][string] $ModuleAndMainClass,
-	[Parameter(Mandatory, HelpMessage="Please provide the windows upgrade uuid for the installer")][string] $UpgradeUUID,
-	[Parameter(Mandatory, HelpMessage="Please provide the name of the vendor")][string] $Vendor,
-	[Parameter(Mandatory, HelpMessage="Please provide the starting year for the copyright notice")][int] $CopyrightStartYear,
-	[Parameter(Mandatory, HelpMessage="Please provide a help url")][string] $HelpUrl,
-	[Parameter(Mandatory, HelpMessage="Please provide an update url")][string] $UpdateUrl,
-	[Parameter(Mandatory, HelpMessage="Please provide an about url")][string] $AboutUrl,
-	[Parameter(Mandatory, HelpMessage="Please provide an alias for localhost")][string] $LoopbackAlias,
-	[bool] $clean = $false # if true, cleans up previous build artifacts
+	[Parameter(HelpMessage="Name of the app")][string] $AppName = 'Cryptomator',
+	[Parameter(HelpMessage="Glob pattern to identify the main jar")][string] $MainJarGlob = 'cryptomator-*',
+	[Parameter(HelpMessage="Module- and main class path to start the app")][string] $ModuleAndMainClass = 'org.cryptomator.desktop/org.cryptomator.launcher.Cryptomator',
+	[Parameter(HelpMessage="Windows upgrade uuid for the installer")][string] $UpgradeUUID = 'bda45523-42b1-4cae-9354-a45475ed4775',
+	[Parameter(HelpMessage="Name of the vendor")][string] $Vendor = 'Skymatic GmbH',
+	[Parameter(HelpMessage="Starting year for the copyright notice")][int] $CopyrightStartYear = 2016,
+	[Parameter(HelpMessage="Help url")][string] $HelpUrl = 'https://cryptomator.org/contact/',
+	[Parameter(HelpMessage="Update url")][string] $UpdateUrl = 'https://cryptomator.org/downloads/',
+	[Parameter(HelpMessage="About url")][string] $AboutUrl = 'https://cryptomator.org',
+	[Parameter(HelpMessage="Alias for localhost")][string] $LoopbackAlias = 'cryptomator-vault',
+	[Parameter(HelpMessage="Clean up previous build artifacts")][switch] $Clean,
+	[Parameter(HelpMessage="Build for ARM64 using the JavaFX jmods bundled in the JDK instead of downloading the x64 jmods")][switch] $Arm64
 )
 
 # ============================
@@ -27,6 +28,20 @@ function Invoke-CommandWithExitCheck {
 		Write-Error "Command '$Command' failed with exit code $LASTEXITCODE"
 		exit $LASTEXITCODE
 	}
+}
+
+function New-LicenseTemplate {
+	param (
+		[string]$Destination,
+		[bool]$WithWinFsp
+	)
+
+	(Get-Content -Raw "$PSScriptRoot\..\common\licenseTemplate.template.ftl") `
+		-replace '###FONT_NAME###', 'Segoe UI' `
+		-replace '###FONT_SIZE###', '16' `
+		-replace '###WITH_WINFSP###', $WithWinFsp.ToString().ToLower() `
+		-replace '###COPYRIGHT_END_YEAR###', (Get-Date).Year `
+		| Set-Content -NoNewline -Encoding ascii $Destination
 }
 
 function Main {
@@ -71,6 +86,7 @@ Write-Host "`$buildDir=$buildDir"
 Write-Host "`$Env:JAVA_HOME=$Env:JAVA_HOME"
 
 $copyright = "(C) $CopyrightStartYear - $((Get-Date).Year) $Vendor"
+$publishTimestamp = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
 
 # compile
 Invoke-CommandWithExitCheck -Command `
@@ -83,52 +99,38 @@ if ($clean -and (Test-Path -Path $runtimeImagePath)) {
 	Remove-Item -Path $runtimeImagePath -Force -Recurse
 }
 
-## download jfx jmods for X64, while they are part of the Arm64 JDK
-$archCode = (Get-CimInstance Win32_Processor).Architecture
-$archName = switch ($archCode) {
-    9  { "x64" }
-    12 { "ARM64" }
-    default { "WMI Win32_Processor.Architecture code ($archCode)" }
-}
+## jfx jmods: part of the ARM64 JDK, downloaded from Gluon for x64
+if ($Arm64) {
+	$javafxBaseJmod = Join-Path $Env:JAVA_HOME "jmods\javafx.base.jmod"
+	if (!(Test-Path $javafxBaseJmod)) {
+		Write-Error "JavaFX module not found in JDK. Please ensure a JDK with JavaFX (including jmods) is installed."
+		exit 1
+	}
 
-switch ($archName) {
-    'ARM64' {
-		$javafxBaseJmod = Join-Path $Env:JAVA_HOME "jmods\javafx.base.jmod"
-		if (!(Test-Path $javafxBaseJmod)) {
-			Write-Error "JavaFX module not found in JDK. Please ensure a JDK with JavaFX (including jmods) is installed."
-			exit 1
-		}
+	$jmodPaths = "$Env:JAVA_HOME/jmods"
+} else {
+	$javaFxVersion='25.0.5'
+	$javaFxJmodsUrl = "https://download2.gluonhq.com/openjfx/${javaFxVersion}/openjfx-${javaFxVersion}_windows-x64_bin-jmods.zip"
+	$javaFxJmodsSHA256 = '41c0361e1183852a3693c5d505ed4aa914bb4190e0adc51ae4db28812a48d2ae'
+	$javaFxJmods = '.\resources\jfxJmods.zip'
 
-        $jmodPaths = "$Env:JAVA_HOME/jmods"
-    }
-    'x64' {
-		$javaFxVersion='25.0.5'
-		$javaFxJmodsUrl = "https://download2.gluonhq.com/openjfx/${javaFxVersion}/openjfx-${javaFxVersion}_windows-x64_bin-jmods.zip"
-		$javaFxJmodsSHA256 = '41c0361e1183852a3693c5d505ed4aa914bb4190e0adc51ae4db28812a48d2ae'
-		$javaFxJmods = '.\resources\jfxJmods.zip'
+	if( !(Test-Path -Path $javaFxJmods) ) {
+		Write-Host "Downloading ${javaFxJmodsUrl}..."
+		Invoke-WebRequest $javaFxJmodsUrl -OutFile $javaFxJmods # redirects are followed by default
+	}
 
-		if( !(Test-Path -Path $javaFxJmods) ) {
-			Write-Host "Downloading ${javaFxJmodsUrl}..."
-			Invoke-WebRequest $javaFxJmodsUrl -OutFile $javaFxJmods # redirects are followed by default
-		}
+	$jmodsChecksumActual = $(Get-FileHash -Path $javaFxJmods -Algorithm SHA256).Hash.ToLower()
+	if( $jmodsChecksumActual -ne $javaFxJmodsSHA256 ) {
+		Write-Error "Checksum mismatch for jfxJmods.zip. Expected: $javaFxJmodsSHA256
+	, actual: $jmodsChecksumActual"
+		exit 1;
+	}
 
-		$jmodsChecksumActual = $(Get-FileHash -Path $javaFxJmods -Algorithm SHA256).Hash.ToLower()
-		if( $jmodsChecksumActual -ne $javaFxJmodsSHA256 ) {
-			Write-Error "Checksum mismatch for jfxJmods.zip. Expected: $javaFxJmodsSHA256
-		, actual: $jmodsChecksumActual"
-			exit 1;
-		}
+	Expand-Archive -Path $javaFxJmods -Force -DestinationPath ".\resources\"
+	Remove-Item -Recurse -Force -Path ".\resources\javafx-jmods" -ErrorAction Ignore
+	Move-Item -Force -Path ".\resources\javafx-jmods-*" -Destination ".\resources\javafx-jmods" -ErrorAction Stop
 
-		Expand-Archive -Path $javaFxJmods -Force -DestinationPath ".\resources\"
-		Remove-Item -Recurse -Force -Path ".\resources\javafx-jmods" -ErrorAction Ignore
-		Move-Item -Force -Path ".\resources\javafx-jmods-*" -Destination ".\resources\javafx-jmods" -ErrorAction Stop
-
-		$jmodPaths="$buildDir/resources/javafx-jmods";
-    }
-    default {
-        Write-Error "Unsupported architecture: $arch"
-        exit 1
-    }
+	$jmodPaths="$buildDir/resources/javafx-jmods";
 }
 
 ## create custom runtime
@@ -155,6 +157,10 @@ Invoke-CommandWithExitCheck -Command `
 Invoke-CommandWithExitCheck -Command `
     "$Env:JAVA_HOME\bin\java" -Arguments @("$buildDir\..\common\RemoveDistrustedCaCerts.java", "runtime\lib\security\cacerts")
 
+### add missing UTF-8.zh fontconfig sequences so the AWT tray menu can render Chinese (#1474)
+Invoke-CommandWithExitCheck -Command `
+    "$Env:JAVA_HOME\bin\java" -Arguments @("$buildDir\AddChineseFontConfigSequences.java", "runtime")
+
 $appPath = ".\$AppName"
 if ($clean -and (Test-Path -Path $appPath)) {
 	Remove-Item -Path $appPath -Force -Recurse
@@ -164,6 +170,7 @@ if ($clean -and (Test-Path -Path $appPath)) {
 $javaOptions = @(
 "--java-options", "--enable-native-access=javafx.graphics,org.cryptomator.frontend.fuse,org.cryptomator.jfuse.win,org.cryptomator.integrations.win,org.cryptomator.desktop"
 "--java-options", "-Xss5m"
+"--java-options", "-XX:-UseBASE64Intrinsics"
 "--java-options", "-Xmx256m"
 "--java-options", "-Dcryptomator.appVersion=`"$semVerNo`""
 "--java-options", "-Dfile.encoding=`"utf-8`""
@@ -181,7 +188,12 @@ $javaOptions = @(
 "--java-options", "-Dcryptomator.integrationsWin.windowsHelloKeychainPaths=`"@{appdata}/$AppName/windowsHelloKeychain.json`""
 "--java-options", "-Dcryptomator.showTrayIcon=true"
 "--java-options", "-Dcryptomator.buildNumber=`"msi-$revisionNo`""
+"--java-options", "-Dcryptomator.publishTimestamp=`"$publishTimestamp`""
 "--java-options", "-Dcryptomator.disableUpdateCheck=false"
+"--java-options", "-Dcryptomator.updateMechanism=org.cryptomator.windows.update.InstallerUpdateMechanism"
+"--java-options", "-Dcryptomator.integrationsWin.updateDurableIdentityEku=1.3.6.1.4.1.311.97.986645502.209118791.449271898.355477593"
+"--java-options", "-Dcryptomator.integrationsWin.updateRootCaThumbprint=F40042E2E5F7E8EF8189FED15519AECE42C3BFA2"
+"--java-options", "-Dcryptomator.integrationsWin.updateHelperName=`"$AppName-updater.exe`""
 "--java-options", "-Dcryptomator.hub.enableTrustOnFirstUse=true"
 )
 
@@ -210,6 +222,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 #Create RTF license for msi
+New-LicenseTemplate -Destination "$buildDir\resources\licenseTemplate.ftl" -WithWinFsp $false
 Invoke-CommandWithExitCheck -Command `
     "../../mvnw.cmd" -Arguments @("-B", "-f", "$buildDir/../../pom.xml", "license:add-third-party", `
     "-Dlicense.thirdPartyFilename=license.rtf", `
@@ -224,7 +237,29 @@ Copy-Item "contrib\*" -Destination "$AppName"
 attrib -r "$AppName\$AppName.exe"
 attrib -r "$AppName\${AppName} (Debug).exe"
 
+# download update helper (installed by resources/main.wxs as "$AppName-updater.exe")
+$updateHelperVersion = '0.2.0'
+$updateHelperArch = if ($Arm64) { 'arm64' } else { 'x64' }
+$updateHelperHashes = @{
+	'x64'   = '4fb5dcf649e25b221b4a55d59a84be216e6cda84a3afa1d0f11c592ae788c664' 
+	'arm64' = '07e0a899b9ca5a38522c17235aeee823704147f1e5253d10c1c9e95483e6c989'
+}
+$updateHelperUrl = "https://github.com/cryptomator/win-updater/releases/download/${updateHelperVersion}/win-updater-${updateHelperArch}.exe"
+$updateHelperPath = "$buildDir\resources\win-updater-${updateHelperArch}.exe"
+Write-Host "Downloading ${updateHelperUrl}..."
+Invoke-WebRequest $updateHelperUrl -OutFile $updateHelperPath # redirects are followed by default
+$computedHash = $(Get-FileHash -Path $updateHelperPath -Algorithm SHA256).Hash.ToLower()
+if ($computedHash -ne $updateHelperHashes[$updateHelperArch]) {
+	Write-Error -Category InvalidData -CategoryActivity "Data integrity check failed" -Message @"
+	Downloaded update helper does not match stored SHA256 checksum.
+	Expected: $($updateHelperHashes[$updateHelperArch])
+	Actual:   $computedHash
+"@
+	exit 1
+}
+
 # create .msi
+$Env:JP_UPDATE_HELPER = $updateHelperPath
 $Env:JP_WIXWIZARD_RESOURCES = "$buildDir\resources\"
 $Env:JP_WIXWIZARD_RESOURCES_PROPERTIES_FORMAT = "${Env:JP_WIXWIZARD_RESOURCES}".Replace('\', '\\');
 $Env:JP_WIXHELPER_DIR = ""
@@ -256,6 +291,7 @@ Invoke-CommandWithExitCheck -Command `
     )
 
 #Create RTF license for bundle
+New-LicenseTemplate -Destination "$buildDir\bundle\resources\licenseTemplate.ftl" -WithWinFsp $true
 Invoke-CommandWithExitCheck -Command `
 	"../../mvnw.cmd" -Arguments @("-B", "-f", "$buildDir/../../pom.xml", "license:add-third-party", `
 	"-Dlicense.thirdPartyFilename=license.rtf", `
