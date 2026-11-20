@@ -9,8 +9,6 @@ name: Build macOS .dmg for x64
 #######################################
 
 on:
-  schedule:
-    - cron: '0 20 20 * *'
   workflow_call:
     inputs:
       semVerNum:

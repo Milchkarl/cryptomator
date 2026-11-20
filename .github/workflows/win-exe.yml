@@ -1,8 +1,6 @@
 name: Build Windows Installer
 
 on:
-  schedule:
-    - cron: '0 19 20 * *'
   workflow_call:
     inputs:
       semVerNum:
@@ -63,15 +61,6 @@ on:
         required: false
         type: boolean
         default: false
-  push:
-    branches-ignore:
-      - 'dependabot/**'
-    paths:
-      - '.github/workflows/win-exe.yml'
-      - 'dist/win/**'
-      - 'dist/common/**'
-
-
 env:
   VERSION_NUM: ${{ inputs.semVerNum || '99.99.99'}}
   REVISION_NUM: ${{ inputs.revisionNum || '0' }}

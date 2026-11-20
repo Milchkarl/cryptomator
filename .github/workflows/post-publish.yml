@@ -1,9 +1,7 @@
 name: Post Release Publish Tasks
 
 on:
-  release:
-    types: [published]
-
+  workflow_dispatch:
 permissions: {}
 
 jobs:

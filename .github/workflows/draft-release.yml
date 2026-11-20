@@ -1,10 +1,7 @@
 name: Draft a Cryptomator Release
 
 on:
-  push:
-    tags:
-        - '*'
-
+  workflow_dispatch:
 env:
   JAVA_DIST: 'temurin'
   JAVA_VERSION: '27.0.1+0'

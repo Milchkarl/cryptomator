@@ -1,8 +1,6 @@
 name: Build AppImage
 
 on:
-  schedule:
-    - cron: '0 23 20 * *'
   workflow_call:
     inputs:
       semVerNum:
@@ -48,16 +46,6 @@ on:
         description: 'The suffix of the version, including dash'
         required: false
         default: '-SNAPSHOT'
-  push:
-    branches-ignore:
-      - 'dependabot/**'
-    paths:
-      - '.github/workflows/appimage.yml'
-      - 'dist/linux/appimage/**'
-      - 'dist/linux/common/**'
-      - 'dist/common/**'
-      - 'dist/linux/resources/**'
-
 permissions:
   contents: read
 

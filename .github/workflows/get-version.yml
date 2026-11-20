@@ -1,6 +1,7 @@
 name: Parse and Validate a version string or tag
 
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       version:

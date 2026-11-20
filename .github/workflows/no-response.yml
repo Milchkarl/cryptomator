@@ -2,9 +2,7 @@
 
 name: 'Close awaiting response issues'
 on:
-  schedule:
-    - cron: '00 09 * * *'
-
+  workflow_dispatch:
 jobs:
   no-response:
     runs-on: ubuntu-slim

@@ -1,11 +1,7 @@
 name: Release Check
 
 on:
-  push:
-    branches:
-      - 'release/**'
-      - 'hotfix/**'
-
+  workflow_dispatch:
 defaults:
   run:
     shell: bash

@@ -1,9 +1,7 @@
 name: Report Download Stats
 
 on:
-  schedule:
-    - cron: '0/15 * * * *' # run every 15 min - don't forget to adjust the "interval" in the json sent to the metrics endpoint
-
+  workflow_dispatch:
 permissions:
   contents: read
 

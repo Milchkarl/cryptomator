@@ -1,8 +1,6 @@
 name: Build macOS .dmg for arm64
 
 on:
-  schedule:
-    - cron: '0 20 20 * *'
   workflow_call:
     inputs:
       semVerNum:
@@ -74,14 +72,6 @@ on:
         required: true
         default: false
         type: boolean
-  push:
-    branches-ignore:
-      - 'dependabot/**'
-    paths:
-      - '.github/workflows/mac-dmg.yml'
-      - 'dist/mac/**'
-      - 'dist/common/**'
-
 env:
   JAVA_DIST: 'temurin'
   JAVA_VERSION: '27.0.1+1'

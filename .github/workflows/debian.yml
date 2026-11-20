@@ -1,8 +1,6 @@
 name: Build Debian Package
 
 on:
-  schedule:
-    - cron: '0 22 20 * *'
   workflow_dispatch:
     inputs:
       semver:
@@ -14,16 +12,6 @@ on:
         required: true
         default: false
         type: boolean
-  push:
-    branches-ignore:
-      - 'dependabot/**'
-    paths:
-      - '.github/workflows/debian.yml'
-      - 'dist/linux/debian/**'
-      - 'dist/linux/common/**'
-      - 'dist/common/**'
-      - 'dist/linux/resources/**'
-
 env:
   JAVA_DIST: 'temurin'
   JAVA_VERSION: '27.0.1+0'

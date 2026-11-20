@@ -1,8 +1,6 @@
 name: Check docs and website URLs #using Lychee
 
 on:
-  schedule:
-    - cron: '0 6 * * 1' # every Monday
   workflow_dispatch:
   workflow_call:
 
