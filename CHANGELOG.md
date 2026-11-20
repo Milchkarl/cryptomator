@@ -22,6 +22,7 @@ Changes to prior versions can be found on the [Github release page](https://gith
 * Touch ID: Fall back to the device password when biometrics are unavailable
 * Improved write performance ([cryptomator/cryptofs#370](https://github.com/cryptomator/cryptofs/pull/370))
 * Updated to JDK 27 ([#4379](https://github.com/cryptomator/cryptomator/pull/4379))
+* Windows: Updated bundled WinFsp to version 2.2
 * Updated dependencies:
   - `org.cryptomator:cryptofs` from 2.11.1 to 2.12.0
   - `org.cryptomator:fuse-nio-adapter` from 7.0.0 to 7.0.1
@@ -42,6 +43,7 @@ Changes to prior versions can be found on the [Github release page](https://gith
 * Fixed a vault showing as locked while unlocked when the tray menu was opened during its unlock ([#4339](https://github.com/cryptomator/cryptomator/pull/4339))
 * Fixed an error window ("Vault not locked." or "Vault not unlocked.") appearing when a vault was unlocked or locked twice in quick succession, for example from a stale tray menu ([#4339](https://github.com/cryptomator/cryptomator/pull/4339))
 * Fixed a custom mount point not being restored when closing the vault's volume failed during lock ([#4339](https://github.com/cryptomator/cryptomator/pull/4339))
+* Fixed the "Visit Download Page" button in the update preferences doing nothing while a vault was unlocked ([#4400](https://github.com/cryptomator/cryptomator/issues/4400))
 * macOS: Fixed clicking a vault entry in the tray menu closing the menu instead of opening its submenu ([#1977](https://github.com/cryptomator/cryptomator/issues/1977))
 * Windows: Fixed possible app crash when locking a vault mounted with WinFsp ([cryptomator/jfuse#176](https://github.com/cryptomator/jfuse/issues/176))
 * Windows: Fixed Chinese text in the tray menu being shown as squares ([#4384](https://github.com/cryptomator/cryptomator/pull/4384))
